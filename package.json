@@ -1,0 +1,112 @@
+{
+  "name": "heating-app",
+  "productName": "Electron Tenma",
+  "version": "1.0.0",
+  "description": "A cross-platform Electron application for managing Tenma devices with a React frontend and Python backend.",
+  "main": "src/main.js",
+  "scripts": {
+    "start-react": "PORT=3001 react-scripts start",
+    "start-electron": "electron-forge start",
+    "start": "concurrently \"electron-forge start\" \"npm run start-react\" ",
+    "package": "electron-forge package",
+    "make": "electron-forge make",
+    "publish": "electron-forge publish",
+    "build-react": "react-scripts build",
+    "build": "npm run build-react && electron-forge make",
+    "lint": "echo \"No linting configured\""
+  },
+  "keywords": [
+    "Electron",
+    "React",
+    "Python",
+    "Tenma",
+    "Cross-platform"
+  ],
+  "author": "pi",
+  "license": "MIT",
+  "devDependencies": {
+    "@babel/core": "^7.26.0",
+    "@babel/preset-react": "^7.26.3",
+    "@electron-forge/cli": "^7.6.0",
+    "@electron-forge/maker-deb": "^7.6.0",
+    "@electron-forge/maker-rpm": "^7.6.0",
+    "@electron-forge/maker-squirrel": "^7.6.0",
+    "@electron-forge/maker-zip": "^7.6.0",
+    "@electron-forge/plugin-auto-unpack-natives": "^7.6.0",
+    "@electron-forge/plugin-fuses": "^7.6.0",
+    "@electron-forge/plugin-webpack": "^7.6.0",
+    "@electron/fuses": "^1.8.0",
+    "@vercel/webpack-asset-relocator-loader": "^1.7.3",
+    "autoprefixer": "^10.4.20",
+    "babel-loader": "^9.2.1",
+    "concurrently": "^9.1.2",
+    "css-loader": "^6.11.0",
+    "electron": "^33.3.1",
+    "electron-packager": "^17.1.2",
+    "electron-rebuild": "^3.2.9",
+    "node-loader": "^2.1.0",
+    "postcss": "^8.4.49",
+    "style-loader": "^3.3.4",
+    "tailwindcss": "^3.4.16"
+  },
+  "dependencies": {
+    "axios": "^1.4.0",
+    "bcrypt": "^5.1.1",
+    "bcryptjs": "^2.4.3",
+    "chart.js": "^4.4.7",
+    "cors": "^2.8.5",
+    "electron-squirrel-startup": "^1.0.1",
+    "react": "^18.3.1",
+    "react-chartjs-2": "^5.2.0",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^7.1.1",
+    "react-scripts": "^5.0.1",
+    "recharts": "^2.14.1",
+    "sqlite3": "^5.1.7"
+  },
+  "build": {
+    "appId": "com.electron.tenma",
+    "productName": "Electron Tenma",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "build/**/*",
+      ".webpack/**/*",
+      "python-backend/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "python-backend/",
+        "to": "python-backend/",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "win": {
+      "target": "squirrel",
+      "icon": "build/icon.ico"
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "build/icon.icns"
+    },
+    "linux": {
+      "target": "AppImage",
+      "icon": "build/icon.png"
+    }
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  }
+}

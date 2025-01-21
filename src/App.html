@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Temperature Control System</title>
+  <link
+    rel="stylesheet"
+    href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css"
+  />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-gray-100 p-6">
+  <div id="temperature-control-page" class="max-w-[90%] mx-auto" style="display: block;">
+    <div class="text-center mb-8">
+      <h1 class="text-3xl font-bold text-gray-800">Temperature Control System</h1>
+      <p id="error-message" class="text-red-500 mt-2" style="display: none;"></p>
+    </div>
+
+    <div class="bg-white p-6 rounded-lg shadow mb-8">
+      <h2 class="text-xl font-semibold mb-4">Current Readings</h2>
+      <p class="text-lg text-gray-700" id="current-temperature">Current Temperature: Loading...</p>
+      <p class="text-lg text-gray-700" id="heat-sink-temperature">Heat Sink Temperature: Loading...</p>
+
+      <div class="flex justify-between items-center my-6">
+        <button
+          id="connect-device"
+          class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded"
+        >
+          Connect Device
+        </button>
+        <span id="connection-status" class="text-sm text-gray-600">Not connected</span>
+      </div>
+
+      <h2 class="text-xl font-semibold mb-4">Temperature Profile</h2>
+      <table class="w-full border-collapse mb-4">
+        <thead>
+          <tr class="bg-gray-50">
+            <th class="p-2 border">T1 (°C)</th>
+            <th class="p-2 border">T2 (°C)</th>
+            <th class="p-2 border">Stay Time (min)</th>
+            <th class="p-2 border">Light Intensity (%)</th>
+          </tr>
+        </thead>
+        <tbody id="profile-table">
+          <!-- Rows will be added dynamically -->
+        </tbody>
+      </table>
+
+      <button
+        id="add-profile"
+        class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded mr-4"
+      >
+        Add Reading
+      </button>
+      <button
+        id="start-process"
+        class="bg-gray-400 text-white font-bold py-2 px-4 rounded"
+        disabled
+      >
+        Start Process
+      </button>
+    </div>
+
+    <div class="bg-white p-6 rounded-lg shadow">
+      <h2 class="text-xl font-semibold mb-4">Temperature vs Time</h2>
+      <canvas id="temperature-chart" height="200"></canvas>
+    </div>
+  </div>
+
+  <script>
+    const temperatureControlPage = document.getElementById('temperature-control-page');
+    const currentTemperatureEl = document.getElementById('current-temperature');
+    const heatSinkTemperatureEl = document.getElementById('heat-sink-temperature');
+    const errorMessageEl = document.getElementById('error-message');
+    const connectionStatusEl = document.getElementById('connection-status');
+    const addProfileBtn = document.getElementById('add-profile');
+    const startProcessBtn = document.getElementById('start-process');
+    const profileTable = document.getElementById('profile-table');
+    const connectDeviceBtn = document.getElementById('connect-device');
+    const chartCtx = document.getElementById('temperature-chart').getContext('2d');
+
+    let connectionStatus = false;
+    let profiles = [];
+    let isProcessing = false;
+    let chart;
+
+    const initializeChart = () => {
+      chart = new Chart(chartCtx, {
+        type: 'line',
+        data: {
+          labels: [],
+          datasets: [{
+            label: 'Temperature (°C)',
+            data: [],
+            borderColor: '#4299E1',
+            borderWidth: 2,
+            tension: 0.1,
+          }],
+        },
+        options: {
+          responsive: true,
+          scales: {
+            x: { title: { display: true, text: 'Time' } },
+            y: { title: { display: true, text: 'Temperature (°C)' } },
+          },
+        },
+      });
+    };
+
+    const fetchData = async () => {
+      try {
+        const response = await fetch('http://localhost:5001/get_data');
+        const data = await response.json();
+
+        const time = new Date().toLocaleTimeString();
+        chart.data.labels.push(time);
+        chart.data.datasets[0].data.push(parseFloat(data.temperature.toFixed(3)));
+        chart.update();
+
+        currentTemperatureEl.textContent = `Current Temperature: ${data.temperature.toFixed(3)} °C`;
+        heatSinkTemperatureEl.textContent = `Heat Sink Temperature: ${(data.sensor2?.temperature || 0).toFixed(3)} °C`;
+      } catch (error) {
+        errorMessageEl.textContent = 'Failed to fetch data';
+        errorMessageEl.style.display = 'block';
+      }
+    };
+
+    connectDeviceBtn.addEventListener('click', async () => {
+      try {
+        const response = await fetch('http://localhost:5001/connect', { method: 'POST' });
+        const data = await response.json();
+
+        if (data.message) {
+          connectionStatus = true;
+          connectionStatusEl.textContent = 'Connected to the power supply';
+          startProcessBtn.classList.remove('bg-gray-400');
+          startProcessBtn.classList.add('bg-blue-500', 'hover:bg-blue-600');
+          startProcessBtn.disabled = false;
+        } else {
+          throw new Error(data.error);
+        }
+      } catch (error) {
+        errorMessageEl.textContent = 'Failed to connect to the device';
+        errorMessageEl.style.display = 'block';
+      }
+    });
+
+    addProfileBtn.addEventListener('click', () => {
+      const t1 = profiles.length ? profiles[profiles.length - 1].t2 : 25;
+      const profile = { t1, t2: '', stayTime: '', lightIntensity: '' };
+      profiles.push(profile);
+
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td class="p-2 border"><input type="number" value="${t1}" readonly class="w-full bg-gray-100 p-1" /></td>
+        <td class="p-2 border"><input type="number" class="w-full p-1" onchange="updateProfile(${profiles.length - 1}, 't2', this.value)" /></td>
+        <td class="p-2 border"><input type="number" class="w-full p-1" onchange="updateProfile(${profiles.length - 1}, 'stayTime', this.value)" /></td>
+        <td class="p-2 border"><input type="number" class="w-full p-1" onchange="updateProfile(${profiles.length - 1}, 'lightIntensity', this.value)" /></td>
+      `;
+      profileTable.appendChild(row);
+    });
+
+    window.updateProfile = (index, field, value) => {
+      profiles[index][field] = parseFloat(value) || '';
+    };
+
+    startProcessBtn.addEventListener('click', async () => {
+  if (!connectionStatus) {
+    errorMessageEl.textContent = 'Device not connected. Connect the device first.';
+    errorMessageEl.style.display = 'block';
+    return;
+  }
+
+  if (profiles.length === 0) {
+    errorMessageEl.textContent = 'No profiles added. Add at least one profile.';
+    errorMessageEl.style.display = 'block';
+    return;
+  }
+
+  try {
+    const response = await fetch('http://localhost:5001/start_process', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ profiles }),
+    });
+
+    const data = await response.json();
+
+    if (data.success) {
+      isProcessing = true;
+      errorMessageEl.style.display = 'none';
+      setInterval(fetchData, 1000); // Start fetching data
+      console.log('Process started successfully.');
+    } else {
+      throw new Error('Failed to start process');
+    }
+  } catch (error) {
+    errorMessageEl.textContent = 'Failed to start process';
+    errorMessageEl.style.display = 'block';
+    console.error(error);
+  }
+});
+
+
+    initializeChart();
+  </script>
+</body>
+</html>
