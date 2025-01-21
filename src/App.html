@@ -40,6 +40,7 @@
             <th class="p-2 border">T2 (°C)</th>
             <th class="p-2 border">Stay Time (min)</th>
             <th class="p-2 border">Light Intensity (%)</th>
+            <th class="p-2 border">Actions</th>
           </tr>
         </thead>
         <tbody id="profile-table">
@@ -86,6 +87,10 @@
     let chart;
 
     const initializeChart = () => {
+      const gradient = chartCtx.createLinearGradient(0, 0, 0, 200);
+      gradient.addColorStop(0, 'rgba(66, 153, 225, 0.6)');
+      gradient.addColorStop(1, 'rgba(66, 153, 225, 0.1)');
+
       chart = new Chart(chartCtx, {
         type: 'line',
         data: {
@@ -95,11 +100,21 @@
             data: [],
             borderColor: '#4299E1',
             borderWidth: 2,
-            tension: 0.1,
+            tension: 0.3,
+            backgroundColor: gradient,
+            fill: true,
           }],
         },
         options: {
           responsive: true,
+          plugins: {
+            legend: { display: true },
+            tooltip: {
+              callbacks: {
+                label: (context) => `Temperature: ${context.raw} °C`,
+              },
+            },
+          },
           scales: {
             x: { title: { display: true, text: 'Time' } },
             y: { title: { display: true, text: 'Temperature (°C)' } },
@@ -157,6 +172,9 @@
         <td class="p-2 border"><input type="number" class="w-full p-1" onchange="updateProfile(${profiles.length - 1}, 't2', this.value)" /></td>
         <td class="p-2 border"><input type="number" class="w-full p-1" onchange="updateProfile(${profiles.length - 1}, 'stayTime', this.value)" /></td>
         <td class="p-2 border"><input type="number" class="w-full p-1" onchange="updateProfile(${profiles.length - 1}, 'lightIntensity', this.value)" /></td>
+        <td class="p-2 border">
+          <button class="bg-red-500 text-white px-3 py-1 rounded" onclick="removeProfile(${profiles.length - 1})">Remove</button>
+        </td>
       `;
       profileTable.appendChild(row);
     });
@@ -165,43 +183,64 @@
       profiles[index][field] = parseFloat(value) || '';
     };
 
+    window.removeProfile = (index) => {
+      profiles.splice(index, 1);
+      renderProfiles();
+    };
+
+    const renderProfiles = () => {
+      profileTable.innerHTML = '';
+      profiles.forEach((profile, index) => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td class="p-2 border"><input type="number" value="${profile.t1}" readonly class="w-full bg-gray-100 p-1" /></td>
+          <td class="p-2 border"><input type="number" class="w-full p-1" onchange="updateProfile(${index}, 't2', this.value)" value="${profile.t2}" /></td>
+          <td class="p-2 border"><input type="number" class="w-full p-1" onchange="updateProfile(${index}, 'stayTime', this.value)" value="${profile.stayTime}" /></td>
+          <td class="p-2 border"><input type="number" class="w-full p-1" onchange="updateProfile(${index}, 'lightIntensity', this.value)" value="${profile.lightIntensity}" /></td>
+          <td class="p-2 border">
+            <button class="bg-red-500 text-white px-3 py-1 rounded" onclick="removeProfile(${index})">Remove</button>
+          </td>
+        `;
+        profileTable.appendChild(row);
+      });
+    };
+
     startProcessBtn.addEventListener('click', async () => {
-  if (!connectionStatus) {
-    errorMessageEl.textContent = 'Device not connected. Connect the device first.';
-    errorMessageEl.style.display = 'block';
-    return;
-  }
+      if (!connectionStatus) {
+        errorMessageEl.textContent = 'Device not connected. Connect the device first.';
+        errorMessageEl.style.display = 'block';
+        return;
+      }
 
-  if (profiles.length === 0) {
-    errorMessageEl.textContent = 'No profiles added. Add at least one profile.';
-    errorMessageEl.style.display = 'block';
-    return;
-  }
+      if (profiles.length === 0) {
+        errorMessageEl.textContent = 'No profiles added. Add at least one profile.';
+        errorMessageEl.style.display = 'block';
+        return;
+      }
 
-  try {
-    const response = await fetch('http://localhost:5001/start_process', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ profiles }),
+      try {
+        const response = await fetch('http://localhost:5001/start_process', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ profiles }),
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          isProcessing = true;
+          errorMessageEl.style.display = 'none';
+          setInterval(fetchData, 1000); // Start fetching data
+          console.log('Process started successfully.');
+        } else {
+          throw new Error('Failed to start process');
+        }
+      } catch (error) {
+        errorMessageEl.textContent = 'Failed to start process';
+        errorMessageEl.style.display = 'block';
+        console.error(error);
+      }
     });
-
-    const data = await response.json();
-
-    if (data.success) {
-      isProcessing = true;
-      errorMessageEl.style.display = 'none';
-      setInterval(fetchData, 1000); // Start fetching data
-      console.log('Process started successfully.');
-    } else {
-      throw new Error('Failed to start process');
-    }
-  } catch (error) {
-    errorMessageEl.textContent = 'Failed to start process';
-    errorMessageEl.style.display = 'block';
-    console.error(error);
-  }
-});
-
 
     initializeChart();
   </script>
