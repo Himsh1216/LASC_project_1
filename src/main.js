@@ -56,8 +56,7 @@ const createMainWindow = () => {
 // Create the login window
 const createLoginWindow = () => {
   loginWindow = new BrowserWindow({
-    width: 400,
-    height: 300,
+    fullscreen : true,
     resizable: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
